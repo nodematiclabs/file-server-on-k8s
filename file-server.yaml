@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-server
+  labels:
+    app: file-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: file-server
+  template:
+    metadata:
+      labels:
+        app: file-server
+    spec:
+      securityContext:
+        fsGroup: 911 # ssh server user
+      containers:
+      - name: caddy
+        image: caddy:2.6.4
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: file-server
+          mountPath: /var/www/html/
+          subPath: public
+        - name: caddyfile
+          mountPath: /etc/caddy/Caddyfile
+          subPath: Caddyfile
+      - name: openssh-server
+        image: linuxserver/openssh-server:version-9.0_p1-r2
+        ports:
+        - containerPort: 2222
+        env:
+        - name: USER_NAME
+          value: "nodematic"
+        - name: PUBLIC_KEY
+          value: ""
+        volumeMounts:
+        - name: file-server
+          mountPath: /var/www/html/
+          subPath: public
+      volumes:
+      - name: file-server
+        persistentVolumeClaim:
+          claimName: file-server-pvc
+      - name: caddyfile
+        configMap:
+          name: caddyfile-v3
+          defaultMode: 0644
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddyfile-v3
+data:
+  Caddyfile: |
+    :80 {
+            # Set this path to your site's directory.
+            root * /var/www/html
+            # Enable the static file server, with file browsing
+            file_server browse
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: file-server-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 32G

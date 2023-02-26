@@ -1,0 +1,62 @@
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: file-server
+spec:
+  domains:
+  - file-server.example.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: file-server
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: file-server
+    networking.gke.io/v1beta1.FrontendConfig: file-server
+    networking.gke.io/managed-certificates: file-server
+spec:
+  defaultBackend:
+    service:
+      name: file-server-http
+      port:
+        number: 80
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: file-server
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-server-http
+  labels:
+    app: file-server-http
+spec:
+  type: ClusterIP
+  selector:
+    app: file-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-server-ssh
+  labels:
+    app: file-server-ssh
+spec:
+  type: LoadBalancer
+  selector:
+    app: file-server
+  ports:
+  - name: ssh
+    port: 22
+    targetPort: 2222
